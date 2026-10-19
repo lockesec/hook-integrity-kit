@@ -1,0 +1,36 @@
+title: Agent Hook Surface Drift Reported by hook-integrity-kit
+id: 775d920f-b064-41fc-ab19-51ab29c37c08
+status: experimental
+description: |
+    hook-integrity-kit reported that the auto-executing hook surface of an AI coding agent
+    project changed since it was last reviewed (a hook script modified or added, the hooks
+    block changed, a permission widened, or the kit itself changed). Events are the kit's
+    JSONL output (docs/events.md), shipped from `session-start --events` or `verify --format jsonl`.
+references:
+    - https://attack.mitre.org/software/S9043/
+date: 2026-10-16
+tags:
+    - attack.persistence
+    - attack.privilege-escalation
+    - attack.t1546
+    - attack.t1554
+    - attack.t1685
+logsource:
+    product: hook-integrity-kit
+    service: events
+detection:
+    selection:
+        schema|startswith: 'hook-integrity-kit.finding/'
+        severity: 'high'
+        evaluable: true
+        kind:
+            - 'MODIFIED'
+            - 'ADDED'
+            - 'SETTINGS'
+            - 'ESCALATED'
+            - 'BYTECODE'
+            - 'KIT_CHANGED'
+    condition: selection
+falsepositives:
+    - A developer edited or added a hook and has not re-blessed yet; the kit's own upgrade (KIT_CHANGED)
+level: high

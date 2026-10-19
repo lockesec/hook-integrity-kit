@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hook-integrity-kit"
+version = "0.1.0"
+description = "Integrity baseline and guardrail hooks for the Claude Code hook surface"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.9"
+dependencies = []
+keywords = ["claude-code", "hooks", "integrity", "supply-chain", "guardrails", "ai-agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Security",
+    "Intended Audience :: Developers",
+    "Environment :: Console",
+    "Operating System :: POSIX",
+    "Development Status :: 4 - Beta",
+]
+
+[project.urls]
+Homepage = "https://github.com/sethpsonnier/hook-integrity-kit"
+Documentation = "https://github.com/sethpsonnier/hook-integrity-kit/tree/main/docs"
+Issues = "https://github.com/sethpsonnier/hook-integrity-kit/issues"
+
+[project.scripts]
+hook-integrity-kit = "hook_integrity_kit.cli:main"
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

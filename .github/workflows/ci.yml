@@ -1,0 +1,40 @@
+# GitHub-hosted runners only. Never attach a self-hosted runner to a public
+# repository: any pull request author could run code on that machine.
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Tests from source
+        run: |
+          python -m pip install --require-hashes -r requirements-ci.txt
+          python -m pytest -q
+      - name: Clean install, then run the installed CLI and the demo
+        run: |
+          python -m venv /tmp/clean
+          # hash-pinned deps and build backend first; then the package itself with
+          # no dependency resolution and no build-isolation download
+          /tmp/clean/bin/pip install --require-hashes -r requirements-ci.txt
+          /tmp/clean/bin/pip install --no-deps --no-build-isolation .
+          cd /tmp
+          PATH=/tmp/clean/bin:$PATH sh "$GITHUB_WORKSPACE"/examples/demo.sh
+          /tmp/clean/bin/hook-integrity-kit install > /dev/null
+          set +e
+          /tmp/clean/bin/hook-integrity-kit verify --root /tmp
+          rc=$?
+          set -e
+          test "$rc" -eq 2

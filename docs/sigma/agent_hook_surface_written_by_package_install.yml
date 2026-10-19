@@ -1,0 +1,50 @@
+title: AI Agent Hook or Task Config Written by a Package Install Process
+id: ed9555fe-2bb0-47cf-89ca-a9bc7d187e2b
+status: experimental
+description: |
+    A file that makes an AI coding agent or editor run commands on its own (Claude Code
+    settings, a project MCP config, a VS Code tasks file) was written by node, bun or a shell
+    whose parent runs from node_modules or a package manager. Mini Shai-Hulud (S9043) planted a
+    SessionStart hook and a folder-open task this way during npm install. Developers and the
+    agent itself also write these files; they are not matched, because the rule requires an
+    install process as the parent.
+references:
+    - https://attack.mitre.org/software/S9043/
+    - https://connect.securonix.com/threat-research-intelligence-62/beta-detection-mini-shai-hulud-claude-code-or-vs-code-persistence-hook-injection-analytic-311
+date: 2026-10-16
+tags:
+    - attack.persistence
+    - attack.privilege-escalation
+    - attack.t1546
+    - attack.t1195.001
+logsource:
+    product: linux
+    category: file_event
+detection:
+    selection_target:
+        TargetFilename|endswith:
+            - '/.claude/settings.json'
+            - '/.claude/settings.local.json'
+            - '/.mcp.json'
+            - '/.vscode/tasks.json'
+    selection_writer:
+        Image|endswith:
+            - '/node'
+            - '/bun'
+            - '/sh'
+            - '/bash'
+    selection_install_parent:
+        - ParentImage|contains: '/node_modules/'
+        - ParentCommandLine|contains:
+            - 'npm-cli.js'
+            - 'npm install'
+            - 'npm ci'
+            - 'pnpm install'
+            - 'yarn install'
+            - 'bun install'
+            - 'preinstall'
+            - 'postinstall'
+    condition: selection_target and selection_writer and selection_install_parent
+falsepositives:
+    - A package that legitimately scaffolds editor or agent configuration during install
+level: high

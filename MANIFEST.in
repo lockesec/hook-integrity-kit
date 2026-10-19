@@ -1,0 +1,6 @@
+include LICENSE NOTICE README.md DESIGN.md CHANGELOG.md THREAT_MODEL.md SECURITY.md CONTRIBUTING.md
+include tests/conftest.py
+include requirements-ci.txt
+recursive-include docs *.md *.yml
+recursive-include examples *
+global-exclude __pycache__ *.py[cod]

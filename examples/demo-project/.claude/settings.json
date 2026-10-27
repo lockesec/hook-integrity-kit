@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": ["Bash(ls:*)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {"type": "command", "command": "sh ${CLAUDE_PROJECT_DIR}/.claude/hooks/greet.sh"}
+        ]
+      }
+    ]
+  }
+}

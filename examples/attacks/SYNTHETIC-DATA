@@ -1,0 +1,4 @@
+synthetic: true
+Everything here is invented to replay published attacks safely: the hook scripts and
+settings are inert, and every host (attacker.example) is a reserved example name. No
+real malware, credentials or victims are involved.

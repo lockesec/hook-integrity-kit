@@ -1,0 +1,17 @@
+# Dependabot proposes bumps as pull requests; nothing merges by itself.
+# The cooldown keeps it from proposing a release younger than two weeks,
+# the window in which most malicious package releases are caught and pulled.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14

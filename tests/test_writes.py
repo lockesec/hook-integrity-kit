@@ -126,7 +126,8 @@ def test_multiedit_is_applied_in_order(settings):
 def test_new_settings_file_with_hooks_is_denied(tmp_path):
     fp = tmp_path / ".claude" / "settings.local.json"
     assert verdict(payload(str(fp), content=json.dumps({"hooks": HOOK}))) == "deny"
-    assert verdict(payload(str(fp), content=json.dumps({"env": {"A": "1"}}))) == "allow"
+    assert verdict(payload(str(fp), content=json.dumps({"env": {"A": "1"}}))) == "deny"
+    assert verdict(payload(str(fp), content=json.dumps({"model": "x"}))) == "allow"
 
 
 def test_unparseable_new_settings_content_fails_closed(settings):

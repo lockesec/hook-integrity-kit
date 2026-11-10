@@ -1,6 +1,25 @@
 # Changelog
 
-## Unreleased
+## 0.1.1 (2026-11-09)
+
+- Python 3.11 or newer is required (3.9 and 3.10 are end-of-life). CI tests 3.11 to 3.14 on `ubuntu-latest`.
+- `audit` flags `OPENSSL_CONF`, `OPENSSL_MODULES` and `OPENSSL_ENGINES` (`!`), not only lists them: each
+  names a config file, provider or engine that OpenSSL loads as a shared library into any process
+  that links it, which is code loading like `LD_PRELOAD`.
+- The whole settings `env` block is pinned, not a list of key names. A name list missed keys
+  such as `OPENSSL_CONF`, `PIP_INDEX_URL` and `ANTHROPIC_CUSTOM_HEADERS`. Every `env` key (name
+  plus a digest of its value; values are never stored or printed) is now part of the settings
+  hash, so adding, changing or removing any key is drift in `verify`/`session-start` and is
+  refused by `check-write`. `audit` lists every `env` key: the names already known to steer
+  code or traffic keep the `!` flag; others get a `?` note and do not fail the audit. `NODE_ENV`
+  moves from flagged to listed (it selects a config profile and loads no code).
+  **Migration:** a baseline blessed with 0.1.0 that has an `env` block in `.claude/settings*.json`
+  shows drift once after upgrading; review the block and run `bless` again.
+
+- `audit --strict` (opt-in): exits 1 when ANY item runs on its own, flagged or not, and the summary
+  line says it is strict mode and why. Default `audit` output and exit codes are unchanged, and
+  a test pins them. `--format json` has a `strict` field and the `RUN` event of `--format jsonl`
+  has one too; existing fields are kept.
 
 Fixes found by a danger review:
 

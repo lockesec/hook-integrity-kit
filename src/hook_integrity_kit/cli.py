@@ -107,6 +107,9 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true", help="machine-readable output")
     p.add_argument("--format", choices=("text", "json", "jsonl"), default=None,
                    help="jsonl: one event per auto-run item plus a RUN event (docs/events.md)")
+    p.add_argument("--strict", action="store_true",
+                   help="exit 1 when ANY item runs on its own, not only when something is "
+                        "flagged (for CI, or a gate before opening a checkout)")
     p = sub.add_parser("rules", help="list the active guard rules and their severity")
     p.add_argument("--config", type=Path, default=None, help="config file to read rules from")
     p.add_argument("--root", type=Path, default=None, help="project root")
@@ -572,7 +575,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     if a.cmd == "audit":
         from . import audit as audit_mod
         fmt = a.format or ("json" if a.json else "text")
-        return audit_mod.main((a.root or Path.cwd()).resolve(), fmt == "json", jsonl=fmt == "jsonl")
+        return audit_mod.main((a.root or Path.cwd()).resolve(), fmt == "json", jsonl=fmt == "jsonl",
+                              strict=a.strict)
     if a.cmd == "rules":
         return cmd_rules(a)
     if a.cmd == "profile":

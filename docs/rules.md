@@ -73,9 +73,9 @@ it into smaller commands.
 a package or module named like the kit (`hook_integrity_kit/`, `hook_integrity_kit.py`)
 anywhere but under a `src/` directory (defence in depth; see the hook command below),
 and **any edit that changes a `hooks` block** in `.claude/settings*.json`, the `hooks` or `mcpServers` of a repo-local plugin (`.claude/plugins/**/hooks.json`, `plugin.json`) and the `mcpServers` of `.mcp.json`. The
-settings rule computes the block (and the interpreter-steering `env` keys, as
-`verify` does) before and after the edit, so permission edits and other env keys
-still work; content it cannot parse is refused. Notes only: edits to hook
+settings rule computes the block (and the whole `env` block, as
+`verify` does) before and after the edit, so permission and model edits
+still work, and any `env` change is refused; content it cannot parse is refused. Notes only: edits to hook
 scripts, and secret-shaped content. Optional per-agent write scopes (see below).
 
 **`check-gate-config`** (Write, Edit, MultiEdit). Refuses modifying an EXISTING
@@ -130,8 +130,8 @@ switches a guard off; `HOOK_PROFILE=minimal|standard|strict` gates your own hook
 through `hook_integrity_kit.profile.should_run()`. The kit's guards run in every
 profile. `HOOK_INTEGRITY_MANAGED_DIRS` and `HOOK_INTEGRITY_GLOBAL_DIR` (where `verify`
 looks for managed settings and the user directory) are operator variables too. All of
-these names are pinned: a `check-write` of the settings `env` block that sets one is
-refused, and one already there is drift.
+every `env` key is pinned, these included: a `check-write` of the settings `env` block that
+adds, changes or removes one is refused, and one already there is drift.
 
 Project config, `.claude/hook-integrity-kit.json` (JSON, so no dependency on
 `tomllib`):

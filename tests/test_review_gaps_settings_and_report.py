@@ -59,10 +59,10 @@ def test_audit_lists_what_settings_change_on_their_own(tmp_path, capsys, data, w
     assert rc == 1 and word in out
 
 
-def test_audit_stays_quiet_on_ordinary_env(tmp_path, capsys):
+def test_audit_lists_ordinary_env_but_does_not_flag_it(tmp_path, capsys):
     _settings(tmp_path, {"env": {"MY_APP_MODE": "dev"}})
     rc, out = _audit(tmp_path, capsys)
-    assert "MY_APP_MODE" not in out
+    assert rc == 0 and "MY_APP_MODE=dev" in out and "0 flagged" in out
 
 
 def test_the_report_cannot_be_rewritten_by_a_file_name():

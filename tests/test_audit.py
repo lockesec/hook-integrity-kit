@@ -176,3 +176,59 @@ def test_devcontainer_in_a_subfolder_is_read(tmp_path, capsys):
     assert "postCreateCommand" in out and ".devcontainer/sub/devcontainer.json" in out
     assert "pipe-to-shell" in out
     assert rc == 1
+
+
+# ── --strict is opt-in: the default audit is unchanged ──────────────────────
+
+def node_hook_fixture(root):
+    write(root, ".claude/settings.json", json.dumps({"hooks": {"SessionStart": [
+        {"hooks": [{"type": "command", "command": "node .claude/scripts/setup.js"}]}]}}))
+    write(root, ".claude/scripts/setup.js", "console.log('hi')\n")
+
+
+DEFAULT_NODE_HOOK_OUTPUT = (
+    "AUTO-RUN Claude Code hook SessionStart (.claude/settings.json): node .claude/scripts/setup.js\n"
+    "  ? runs when a session starts, before the first prompt\n"
+    "audit: 1 item(s) run on their own, 0 flagged\n")
+
+
+def test_default_audit_output_and_exit_are_pinned_and_do_not_mention_strict(tmp_path, capsys):
+    node_hook_fixture(tmp_path)
+    rc, out = audit(tmp_path, capsys)
+    assert rc == 0
+    assert out == DEFAULT_NODE_HOOK_OUTPUT
+    assert "strict" not in out
+
+
+def test_strict_fails_on_an_unflagged_auto_run_item_and_says_why(tmp_path, capsys):
+    node_hook_fixture(tmp_path)
+    rc, out = audit(tmp_path, capsys, "--strict")
+    assert rc == 1
+    assert out == DEFAULT_NODE_HOOK_OUTPUT.replace(
+        "0 flagged\n", "0 flagged; strict: 1 item(s) run on their own; review each before "
+                       "opening this checkout\n")
+
+
+def test_strict_on_a_checkout_that_runs_nothing_still_passes(tmp_path, capsys):
+    rc, out = audit(tmp_path, capsys, "--strict")
+    assert rc == 0 and "strict:" not in out
+
+
+def test_strict_json_and_jsonl_carry_a_strict_field(tmp_path, capsys):
+    node_hook_fixture(tmp_path)
+    rc, out = audit(tmp_path, capsys, "--json")
+    assert rc == 0 and json.loads(out)["strict"] is False and json.loads(out)["flagged"] == 0
+    rc, out = audit(tmp_path, capsys, "--json", "--strict")
+    assert rc == 1 and json.loads(out)["strict"] is True and json.loads(out)["items"]
+    rc, out = audit(tmp_path, capsys, "--format", "jsonl", "--strict")
+    run = json.loads(out.splitlines()[-1])
+    assert rc == 1 and run["strict"] is True and run["status"] == "flagged"
+    assert run["counts"]["flagged"] == 0 and run["counts"]["AUTO_RUN"] == 1
+    rc, out = audit(tmp_path, capsys, "--format", "jsonl")
+    run = json.loads(out.splitlines()[-1])
+    assert rc == 0 and run["strict"] is False and run["status"] == "listed"
+
+
+def test_audit_help_documents_strict(capsys):
+    cli.main(["audit", "--help"])
+    assert "--strict" in capsys.readouterr().out

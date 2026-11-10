@@ -7,7 +7,7 @@ What `hook-integrity-kit` defends, against whom, and where it stops.
 The **auto-executing surface** of a Claude Code project: every command Claude Code
 runs without asking, because a settings file or plugin registered it as a hook.
 That is the `hooks` block of `.claude/settings.json` and
-`.claude/settings.local.json` (with the `env` keys that steer interpreters), the
+`.claude/settings.local.json` (with the whole `env` block), the
 hook registrations of repo-local plugins, the scripts all of those name, and what
 Python loads for those scripts. Hooks run with the developer's full user
 permissions, on every session start and, for PreToolUse/PostToolUse, on every tool
@@ -42,7 +42,7 @@ are changes to an already-trusted project:
    module it imports, a bytecode cache Python prefers, a sibling package that
    shadows a standard-library name, a symlinked entry point retargeted so Python
    resolves imports from another directory, or an `env` key (`PYTHONPATH`,
-   `BASH_ENV`, `LD_PRELOAD`, ...) that redirects the interpreter.
+   `BASH_ENV`, `LD_PRELOAD`, `OPENSSL_CONF`, `PIP_INDEX_URL`, ...) that redirects the interpreter or a tool.
 4. **Agent edit**: the model, possibly steered by injected content, edits a hook
    script, adds a registration, or edits `settings.local.json`, which is usually
    not committed and rarely reviewed.
@@ -79,7 +79,7 @@ model does when called is not something a file hash can see.
 |---|---|---|
 | 1, 2, 3 | `verify` / `session-start`: SHA-256 of every registered script (settings and plugins, one resolver), whatever Python's path finder loads for a hooked Python file from its resolved directory (transitively), bytecode caches checked against source, symlinked entry points' targets, plugin registration files, and the canonical `hooks` block plus interpreter-steering `env` keys of both settings files | **Detect**, named per file |
 | 4 (hook script) | `check-write` note ("re-bless after review") + `verify` drift | Detect |
-| 4 (registration) | `check-write` refuses any Write/Edit/MultiEdit that changes a `hooks` block, an interpreter-steering `env` key or a hook-control key (`disableAllHooks`, `allowManagedHooksOnly`, ...: they switch every hook off or narrow them), in a project settings file or in `~/.claude/settings.json`, including through a symlink or a differently cased name; `verify` hashes the same keys | **Prevent** (tool path only) + detect |
+| 4 (registration) | `check-write` refuses any Write/Edit/MultiEdit that changes a `hooks` block, any `env` key or a hook-control key (`disableAllHooks`, `allowManagedHooksOnly`, ...: they switch every hook off or narrow them), in a project settings file or in `~/.claude/settings.json`, including through a symlink or a differently cased name; `verify` hashes the same keys | **Prevent** (tool path only) + detect |
 | 4 (self-bless) | `check-command` refuses `bless` (also in quoted or escaped spellings of plain words) and shell writes, links, restores or deletes of the baseline and kit config through the redirect operators `>`, `>>`, `>\|`, `&>`, `>&FILE`, `<>`, the verbs `tee cp mv ln install rsync truncate rm dd unlink` and `git checkout/restore`, `git diff --output=`, and `sed`/`perl` in-place editing, all matched by the baseline's FILE NAME (replacing the whole `.claude/` directory is not matched; see below); `check-write` refuses them through the write tools | Prevent (text match) |
 | 4 (git internals) | `check-write` refuses writes under `.git/` (hooks, config) | Prevent (tool path only) |
 | 5 | `bless --include-global`: `~/.claude` registrations and their scripts | Detect, **warn-only** |
@@ -142,11 +142,14 @@ model does when called is not something a file hash can see.
   (NOT CHECKED when the cache exists), managed settings files (NOT CHECKED when
   present), MCP server binaries, installed Python packages, and scripts registered
   by absolute path outside the project (NOT CHECKED). Remote-managed settings, MDM
-  and registry policy and `~/.claude.json` are not looked at and not reported. The `permissions` block and
-  `env` keys that do not steer an interpreter are deliberately not drift, so that
-  ordinary changes do not train people to re-bless blindly. Whether Claude Code
-  hands the settings `env` block to hook processes is not verified by this kit; it
-  pins the interpreter-steering keys on the assumption that it may.
+  and registry policy and `~/.claude.json` are not looked at and not reported. The `permissions` block is
+  deliberately not drift, so that ordinary changes do not train people to re-bless
+  blindly. The whole `env` block IS pinned (a digest per key), because a list of
+  names misses the tools nobody listed (`OPENSSL_CONF`, `PIP_INDEX_URL`,
+  `ANTHROPIC_CUSTOM_HEADERS`); the price is that an innocent `env` edit such as
+  `NODE_ENV` reads as drift and needs a re-bless. Whether Claude Code hands the
+  settings `env` block to hook processes is not verified by this kit; it pins the
+  block on the assumption that it may.
 - **Hook types and locations beyond the scope above**: listed as NOT CHECKED where
   the kit can see them; the classes it cannot are named in
   [docs/coverage.md](docs/coverage.md#not-covered) and are not reported.

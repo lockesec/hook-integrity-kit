@@ -67,7 +67,8 @@ def from_verify(findings: dict, project: Optional[str], source: str = "verify") 
     return out + [run]
 
 
-def from_audit(items: Iterable, unreadable: Iterable, project: Optional[str]) -> List[dict]:
+def from_audit(items: Iterable, unreadable: Iterable, project: Optional[str],
+               strict: bool = False) -> List[dict]:
     """Events for an `audit`: one AUTO_RUN per item (high when flagged, medium with a review
     note, info otherwise), one NOT_EVALUABLE per unreadable config, and a RUN event."""
     when = _now()
@@ -85,11 +86,14 @@ def from_audit(items: Iterable, unreadable: Iterable, project: Optional[str]) ->
     for u in unread:
         out.append({**_base("audit", project, when), "kind": "NOT_EVALUABLE", "severity": "medium",
                     "evaluable": False, "detail": u, "attack": []})
-    status = "error" if unread else "flagged" if flagged else "listed"
+    auto_run = len(out) - len(unread)
+    failed = flagged or (strict and auto_run)
+    status = "error" if unread else "flagged" if failed else "listed"
     out.append({**_base("audit", project, when), "kind": "RUN", "status": status,
-                "severity": "high" if flagged else "medium" if unread else "info",
+                "strict": strict,
+                "severity": "high" if failed else "medium" if unread else "info",
                 "evaluable": not unread, "attack": [],
-                "counts": {"AUTO_RUN": len(out) - len(unread), "flagged": flagged,
+                "counts": {"AUTO_RUN": auto_run, "flagged": flagged,
                            "NOT_EVALUABLE": len(unread)}})
     return out
 

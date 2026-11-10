@@ -6,7 +6,7 @@ Three layers, evaluated in this order:
 
 1. **Hard blocks** (deny, exit 2): credential and key files, system directories,
    git internals, the kit's own baseline and config, and any edit that changes
-   the ``hooks`` block of a Claude Code settings file, an execution-affecting ``env``
+   the ``hooks`` block of a Claude Code settings file, any ``env``
    key, or a hook-control key (``disableAllHooks``, ``allowManagedHooksOnly``, ...).
 2. **Per-agent write scopes** (deny): an agent listed in the config's
    ``agent_scopes`` may only write inside its allow-globs. Identity comes from the
@@ -28,11 +28,10 @@ this narrows the alias hole, it cannot close a race.
 The settings rule is precise on purpose. Blocking every edit to
 ``settings.json`` would make permission changes impossible; allowing all of them
 lets an agent register a new hook, which then runs automatically on every later
-tool call. So the rule computes the hooks block, together with the ``env`` keys
-that steer what an interpreter loads (``PATH``, ``PYTHONPATH``, ``BASH_ENV``,
-``LD_PRELOAD``, ...), before and after the edit and blocks only when that
-changes, the same line ``verify`` draws (an unrelated settings change is never
-drift). An operator who really wants an agent to edit
+tool call. So the rule computes the hooks block, together with the whole ``env``
+block (a digest per key; no name list can name every tool's config variable), before and
+after the edit and blocks only when that changes, the same line ``verify`` draws (an
+unrelated settings change, a permission or the model, is never drift). An operator who really wants an agent to edit
 hooks sets ``HOOK_KIT_ALLOW_HOOK_EDITS=1`` in the environment Claude Code runs
 in; an agent's own Bash calls cannot set that for the hook process.
 """
@@ -52,7 +51,7 @@ from typing import Dict, List, Optional, Tuple
 
 from . import config as cfgmod
 from . import hookio
-from .manifest import exec_env, hook_controls, settings_surface_hash
+from .manifest import hook_controls, pinned_env, settings_surface_hash
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 HOOK_EDIT_OVERRIDE = "HOOK_KIT_ALLOW_HOOK_EDITS"
@@ -256,7 +255,7 @@ def is_baseline_file(fp: str, cwd: Optional[str]) -> bool:
 
 
 def _surface_of(text: Optional[str]) -> Optional[Tuple[str, bool]]:
-    """(hash of the hooks block plus execution-affecting env keys, whether
+    """(hash of the hooks block plus the env block, whether
     either is non-empty) for a settings text, the same surface ``verify``
     pins. None if the text is not a JSON object."""
     if text is None:
@@ -270,7 +269,7 @@ def _surface_of(text: Optional[str]) -> Optional[Tuple[str, bool]]:
     hooks = data.get("hooks") or {}
     if not isinstance(hooks, dict):
         return None
-    env = exec_env(data.get("env"))
+    env = pinned_env(data.get("env"))
     controls = hook_controls(data)
     return settings_surface_hash(hooks, env, controls), bool(hooks or env or controls)
 
@@ -347,11 +346,11 @@ def settings_hooks_change(tool: str, ti: dict, fp: str, cwd: Optional[str],
                 "`mcpServers`)" if before[0] != after[0] else None)
     if before is None:
         return ("the current file does not parse, and the new content registers hooks, sets an "
-                "execution-affecting env key, a hook-control key or a command setting "
+                "`env` block, a hook-control key or a command setting "
                 "(statusLine, apiKeyHelper, ...)" if after[1] else None)
     if before[0] != after[0]:
-        return ("it changes the `hooks` block, an env key that steers what hooks load "
-                "(PATH, PYTHON*, BASH_ENV, LD_*, ...), or a key that switches hooks off or "
+        return ("it changes the `hooks` block, the `env` block (any key: "
+                "PATH, PYTHON*, OPENSSL_CONF, proxy and index settings, ...), or a key that switches hooks off or "
                 "narrows them (disableAllHooks, allowManagedHooksOnly, ...)")
     return None
 

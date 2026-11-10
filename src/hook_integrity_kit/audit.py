@@ -18,7 +18,8 @@ and notes for review (`?`, not a failure): a `SessionStart` hook (it runs before
 prompt), and a hook script that reaches the network without running fetched code.
 
 It reads files only; it runs and writes nothing. Exit 0: nothing flagged (the list may still
-be long: read it). Exit 1: something flagged. Exit 2: a config file could not be read, so the
+be long: read it). Exit 1: something flagged. With ``--strict`` (opt-in) exit 1 also when ANY
+item runs on its own, flagged or not. Exit 2: a config file could not be read, so the
 list is incomplete (named).
 """
 from __future__ import annotations
@@ -41,7 +42,7 @@ _RUNS_CODE = re.compile(
     r"\bInvoke-Expression\b|\bchild_process\b|\bspawn\s*\(|\bexecSync\s*\(", re.I)
 _SHELL_SUFFIXES = (".sh", ".bash", ".zsh", ".ksh")
 #: An env value under a name like this is a credential: the name is the finding, not the value.
-_SECRET_NAME = re.compile(r"TOKEN|SECRET|PASSW|API_?KEY|CREDENTIAL", re.I)
+_SECRET_NAME = re.compile(r"TOKEN|SECRET|PASSW|API_?KEY|CREDENTIAL|AUTH|HEADER|COOKIE", re.I)
 
 
 def _shown(m: "re.Match") -> str:
@@ -286,10 +287,16 @@ class Audit:
             self.permissions(rel, data)
             env = data.get("env")
             for key, value in (env.items() if isinstance(env, dict) else ()):
+                shown = "(value not shown)" if _SECRET_NAME.search(str(key)) else value
                 if manifest.is_exec_env(key):
-                    shown = "(value not shown)" if _SECRET_NAME.search(key) else value
                     self.add("Claude Code setting env", rel, f"{key}={shown}",
                              ["changes what code or traffic runs on this machine"])
+                else:
+                    # Every env key is listed (verify pins them all); only the names known to
+                    # steer code or traffic are flagged.
+                    self.add("Claude Code setting env", rel, f"{key}={shown}", [],
+                             ["sets an environment variable for this project; verify pins it, "
+                              "and this name is not known to steer code or traffic"])
             for key in ("enabledPlugins", "extraKnownMarketplaces"):
                 if data.get(key):
                     self.add(f"Claude Code setting {key}", rel, json.dumps(data[key])[:200],
@@ -404,7 +411,7 @@ class Audit:
         return self
 
 
-def main(root: Path, as_json: bool = False, jsonl: bool = False) -> int:
+def main(root: Path, as_json: bool = False, jsonl: bool = False, strict: bool = False) -> int:
     if not root.is_dir():
         msg = (f"{root} does not exist or is not a directory; nothing was audited. "
                "This is not a pass.")
@@ -416,14 +423,17 @@ def main(root: Path, as_json: bool = False, jsonl: bool = False) -> int:
         return 2
     a = Audit(root).run()
     flagged = sum(1 for _k, _w, _x, f, _n in a.items if f)
+    # --strict (opt-in): anything that runs on its own fails the audit, flagged or not.
+    strict_fail = strict and bool(a.items)
     if jsonl:
         from . import events
-        print(events.dumps(events.from_audit(a.items, a.unreadable, str(root))))
+        print(events.dumps(events.from_audit(a.items, a.unreadable, str(root), strict=strict)))
     elif as_json:
         print(json.dumps({"root": str(root), "items": [
             {"kind": k, "where": w, "what": x, "flags": f, "notes": n}
             for k, w, x, f, n in a.items],
-            "unreadable": a.unreadable, "flagged": flagged}, indent=2))
+            "unreadable": a.unreadable, "flagged": flagged, "strict": strict},
+            indent=2))
     else:
         if not a.items and not a.unreadable:
             print(f"audit: {root}: nothing here runs on its own (Claude Code hooks, plugin hooks "
@@ -437,7 +447,9 @@ def main(root: Path, as_json: bool = False, jsonl: bool = False) -> int:
         for u in a.unreadable:
             print(f"NOT EVALUABLE: {u} (what it declares is not listed)")
         print(f"audit: {len(a.items)} item(s) run on their own, {flagged} flagged"
-              + (f", {len(a.unreadable)} file(s) unreadable" if a.unreadable else ""))
+              + (f", {len(a.unreadable)} file(s) unreadable" if a.unreadable else "")
+              + (f"; strict: {len(a.items)} item(s) run on their own; review each before "
+                 "opening this checkout" if strict_fail else ""))
     if a.unreadable:
         return 2
-    return 1 if flagged else 0
+    return 1 if flagged or strict_fail else 0

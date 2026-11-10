@@ -4,12 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hook-integrity-kit"
-version = "0.1.0"
+version = "0.1.1"
 description = "Integrity baseline and guardrail hooks for the Claude Code hook surface"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
-requires-python = ">=3.9"
+authors = [{ name = "locke" }]
+requires-python = ">=3.11"
 dependencies = []
 keywords = ["claude-code", "hooks", "integrity", "supply-chain", "guardrails", "ai-agents"]
 classifiers = [

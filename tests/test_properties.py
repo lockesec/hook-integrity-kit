@@ -351,7 +351,7 @@ def test_settings_hooks_edit_denied_other_edits_allowed(proj):
     assert writes.decide(W(s, "{not json", proj), {})[0] == "deny"
     env = json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "env": {"PYTHONPATH": "."}})
     assert writes.decide(W(s, env, proj), {})[0] == "deny"
-    env_ok = json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "env": {"FOO": "1"}})
+    env_ok = json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "model": "y"})
     assert writes.decide(W(s, env_ok, proj), {})[0] != "deny"
     dis = json.dumps({"permissions": {"allow": ["Bash(ls)"]}, "disableAllHooks": True})
     assert writes.decide(W(s, dis, proj), {})[0] == "deny"
@@ -521,7 +521,7 @@ def test_bless_then_verify_clean_then_drift(iproj):
 
 def test_unrelated_settings_change_is_not_drift(iproj):
     run_cli("bless", "--root", str(iproj))
-    s = dict(HOOK_SETTINGS, permissions={"allow": ["Bash(ls)"]}, model="x", env={"FOO": "1"})
+    s = dict(HOOK_SETTINGS, permissions={"allow": ["Bash(ls)"]}, model="x")
     (iproj / ".claude" / "settings.json").write_text(json.dumps(s))
     assert run_cli("verify", "--root", str(iproj)) == 0
 

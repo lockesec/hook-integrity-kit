@@ -74,7 +74,7 @@ def test_kit_control_variable_in_settings_env_is_drift(tmp_path, key):
     assert res["status"] == "drift" and res["settings_changed"] == [".claude/settings.json"]
 
 
-def test_benign_env_key_in_settings_is_not_drift(tmp_path):
+def test_benign_env_key_in_settings_is_drift_now_that_the_whole_env_block_is_pinned(tmp_path):
     root = project(tmp_path, HOOK)
     (root / ".claude/hooks/h.py").write_text("print('ok')\n")
     bless(root)
@@ -82,7 +82,7 @@ def test_benign_env_key_in_settings_is_not_drift(tmp_path):
     data = json.loads(p.read_text())
     data["env"] = {"FOO": "1"}
     p.write_text(json.dumps(data))
-    assert M.check(root)["status"] == "clean"
+    assert M.check(root)["status"] == "drift"
 
 
 @pytest.mark.parametrize("key", KIT_ENV)
@@ -92,10 +92,10 @@ def test_check_write_refuses_a_kit_control_variable_in_settings_env(tmp_path, ke
     assert verdict == "deny" and "env" in msg
 
 
-def test_check_write_allows_a_benign_env_key(tmp_path):
+def test_check_write_refuses_a_benign_env_key_too(tmp_path):
     root = project(tmp_path, HOOK)
     verdict, _ = W.decide(_write_payload(root, {"hooks": HOOK, "env": {"FOO": "1"}}), {})
-    assert verdict == "allow"
+    assert verdict == "deny"
 
 
 @pytest.mark.parametrize("key", CTL)
@@ -257,9 +257,9 @@ def test_an_execution_env_key_is_drift(tmp_path, key):
     assert res["status"] == "drift" and res["settings_changed"] == [".claude/settings.json"]
 
 
-@pytest.mark.parametrize("change", [{"model": "other"}, {"env": {"MY_FEATURE_FLAG": "1"}},
+@pytest.mark.parametrize("change", [{"model": "other"},
                                     {"permissions": {"allow": ["Bash(git:*)"]}}])
-def test_unrelated_settings_and_env_are_still_not_drift(tmp_path, change):
+def test_unrelated_settings_are_still_not_drift(tmp_path, change):
     root = project(tmp_path, HOOK)
     (root / ".claude/hooks/h.py").write_text("print('ok')\n")
     bless(root)
@@ -276,8 +276,8 @@ def test_check_write_refuses_an_execution_env_edit(tmp_path, key):
     assert verdict == "deny" and "env" in msg
 
 
-@pytest.mark.parametrize("content", [{"hooks": HOOK, "env": {"MY_FEATURE_FLAG": "1"}},
-                                     {"hooks": HOOK, "model": "other"}])
+@pytest.mark.parametrize("content", [{"hooks": HOOK, "model": "other"},
+                                     {"hooks": HOOK, "permissions": {"allow": ["Bash(ls)"]}}])
 def test_check_write_allows_unrelated_settings(tmp_path, content):
     root = project(tmp_path, HOOK)
     verdict, _ = W.decide(_write_payload(root, content), {})

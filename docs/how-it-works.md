@@ -70,4 +70,4 @@ BLOCKED [HIGH] downloaded content piped straight into a shell or interpreter (ru
   guards; the tests run the exact registered command in a project holding such files.
 - **Tested.** Each finding was reproduced against the source and pinned to a test before the fix
   (the history is in [DESIGN.md](../DESIGN.md)). The test suite (`python -m pytest`) runs in CI on
-  Python 3.9 through 3.14.
+  Python 3.11 through 3.14.

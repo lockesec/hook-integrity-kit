@@ -23,7 +23,7 @@ alert on drift AND on hosts that stopped reporting, instead of reading silence a
 | `evaluable` | bool | false when this event records something the kit could not check |
 | `detail` | string | the path, item or reason, as the text report prints it |
 | `attack` | list | Enterprise ATT&CK technique ids (v20), possibly empty |
-| `status`, `counts` | `RUN` only | `clean`, `drift`, `no-baseline` or `error` (verify); `listed`, `flagged` or `error` (audit); findings per kind |
+| `status`, `counts` | `RUN` only | `clean`, `drift`, `no-baseline` or `error` (verify); `listed`, `flagged` or `error` (audit; a `--strict` run with any item is `flagged`, and the `RUN` event carries `strict`); findings per kind |
 | `path`, `registration`, `flags`, `notes` | `AUTO_RUN` only | where it is declared, what kind of registration, why it is flagged or noted |
 
 ## Kinds and ATT&CK
